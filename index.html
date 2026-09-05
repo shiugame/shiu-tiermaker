@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>紫羽GAME TierMaker風</title>
+<style>
+:root {
+  --bg:#09070d; --panel:#15101b; --line:#4a3c59; --text:#f7f3fb; --muted:#b8acc5;
+  --ss:#7b2f67; --s:#6d3d88; --a:#4f4d87; --b:#3b536f; --c:#39404d;
+  --card:52px; --gap:4px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#050408;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif}
+body{min-height:100%}
+#viewport{width:100%;display:flex;justify-content:center;align-items:flex-start;background:#050408}
+#app{
+  width:min(100%,1920px);
+  aspect-ratio:16/9;
+  max-height:1080px;
+  min-height:720px;
+  background:radial-gradient(circle at 50% 0%,#1a1023 0,#0b0810 48%,#070509 100%);
+  padding:14px;
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr) 315px;
+  gap:10px;
+  overflow:hidden;
+}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:rgba(21,16,27,.96);border:1px solid #2f2538;border-radius:10px}
+.toolbar strong{font-size:18px;margin-right:auto}
+button,select{background:#2a2033;color:var(--text);border:1px solid #5d4d6d;border-radius:8px;padding:7px 10px;font:inherit}
+button{cursor:pointer}
+.status{color:var(--muted);font-size:13px}
+.board{display:grid;grid-template-rows:repeat(5,minmax(0,1fr));gap:6px;min-height:0}
+.tier{display:grid;grid-template-columns:90px 1fr;min-height:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#100c15}
+.label{display:flex;align-items:center;justify-content:center;font-weight:900;font-size:30px;letter-spacing:.03em}
+.label.ss{background:linear-gradient(180deg,#8b3b76,#532046)} 
+.label.s{background:linear-gradient(180deg,#8250a2,#513464)} 
+.label.a{background:linear-gradient(180deg,#5f61a0,#3f416d)} 
+.label.b{background:linear-gradient(180deg,#48647f,#30465a)} 
+.label.c{background:linear-gradient(180deg,#505764,#343a45)}
+.zone{min-width:0;min-height:0;display:flex;align-content:center;align-items:flex-start;flex-wrap:wrap;gap:var(--gap);padding:5px;position:relative;overflow:hidden}
+.tier .zone{align-content:center}
+/* A・Bランクは1段12キャラ固定で折り返す */
+.zone[data-tier="A"],
+.zone[data-tier="B"]{
+  display:grid;
+  grid-template-columns:repeat(12,var(--card));
+  grid-auto-rows:var(--card);
+  justify-content:start;
+  align-content:center;
+  align-items:start;
+}
+.zone.dragover{outline:3px solid #b58bd2;outline-offset:-3px;background:#1d1426}
+.card{
+  width:var(--card);height:var(--card);flex:0 0 var(--card);
+  border-radius:6px;border:1px solid #81708d;
+  background-image:url("characters.jpg");
+  background-size:1000% 2800%;background-repeat:no-repeat;
+  cursor:grab;box-shadow:0 1px 0 rgba(255,255,255,.12) inset;position:relative;padding:0
+}
+.card:active{cursor:grabbing}
+.card{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.touch-ghost{position:fixed;z-index:9999;pointer-events:none;opacity:.88;transform:translate(-50%,-50%) scale(1.08);box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.touch-target{outline:3px solid #b58bd2!important;outline-offset:-3px!important;background:#1d1426!important}
+.card.selected{outline:3px solid #fff;outline-offset:1px}
+.label{cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+.label.tap-ready{outline:3px solid #fff;outline-offset:-4px;filter:brightness(1.18)}
+.card.dragging{opacity:.35}
+.waiting-wrap{border:1px solid #3e2d4c;border-radius:12px;overflow:hidden;background:#100b15;min-height:0;display:grid;grid-template-rows:38px 1fr}
+.waiting-head{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#281b35;font-weight:800}
+.waiting{padding:8px;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#654b77 #17101f}
+.waiting::-webkit-scrollbar{width:10px}
+.waiting::-webkit-scrollbar-track{background:#17101f}
+.waiting::-webkit-scrollbar-thumb{background:#654b77;border-radius:8px}
+.hint{font-size:12px;color:var(--muted);font-weight:500}
+.obs .toolbar{display:none}
+.obs #app{grid-template-rows:minmax(0,1fr) 330px;padding:10px;gap:8px}
+.obs .board{gap:5px}
+.obs .tier{grid-template-columns:82px 1fr}
+.obs .label{font-size:28px}
+.obs .waiting-head{height:36px}
+@media(max-width:1200px){
+  :root{--card:46px}
+  #app{min-height:650px;grid-template-rows:auto minmax(0,1fr) 280px}
+  .tier{grid-template-columns:72px 1fr}
+  .label{font-size:24px}
+}
+@media(max-width:800px){
+  #app{aspect-ratio:auto;min-height:900px;grid-template-rows:auto minmax(520px,1fr) 320px;padding:8px}
+  .tier{grid-template-columns:56px 1fr}
+  .label{font-size:18px}
+  :root{--card:42px}
+}
+</style>
+<meta name="theme-color" content="#09070d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="紫羽 TierMaker">
+</head>
+<body>
+<div id="viewport">
+<div id="app">
+  <div class="toolbar">
+    <strong>紫羽GAME Tier Board</strong>
+    <span class="status" id="status">PC：ドラッグ｜スマホ：キャラをタップ→Tier名をタップ（長押し移動も可）</span>
+    <label>選択中を移動
+      <select id="moveSelect">
+        <option value="">移動先</option><option value="SS">SS</option><option value="S">S</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="WAITING">WAITING</option>
+      </select>
+    </label>
+    <button type="button" id="reset">リセット</button>
+    <button type="button" id="deleteSelected">選択キャラを削除</button>
+    <span class="status" id="autosaveState">自動保存：ON</span>
+<label>手動保存
+<select id="saveSlot"><option value="1">保存枠1</option><option value="2">保存枠2</option><option value="3">保存枠3</option></select>
+</label>
+<button type="button" id="saveSlotBtn">この枠に保存</button>
+<button type="button" id="loadSlotBtn">この枠を読込</button>
+    <button type="button" id="exportPng">Tier表を画像保存</button>
+    <button type="button" id="obsMode">OBSモード</button>
+  </div>
+
+  <div class="board">
+    <div class="tier"><div class="label ss">SS</div><div class="zone" data-tier="SS"></div></div>
+    <div class="tier"><div class="label s">S</div><div class="zone" data-tier="S"></div></div>
+    <div class="tier"><div class="label a">A</div><div class="zone" data-tier="A"></div></div>
+    <div class="tier"><div class="label b">B</div><div class="zone" data-tier="B"></div></div>
+    <div class="tier"><div class="label c">C</div><div class="zone" data-tier="C"></div></div>
+  </div>
+
+  <section class="waiting-wrap">
+    <div class="waiting-head"><span>WAITING / 未評価キャラ 280体</span><span class="hint">スマホ：キャラをタップ→Tier名をタップ｜長押し移動も可</span></div>
+    <div class="zone waiting" data-tier="WAITING"></div>
+  </section>
+</div>
+</div>
+
+<script>
+(() => {
+  const waiting=document.querySelector('[data-tier="WAITING"]');
+  const zones=[...document.querySelectorAll('.zone')];
+  const status=document.getElementById('status');
+  const moveSelect=document.getElementById('moveSelect');
+  // Native HTML5 drag is only enabled on desktop-class pointers.
+  // Android Chrome can otherwise start a native drag that leaves the card dimmed.
+  const desktopDnD=window.matchMedia('(hover:hover) and (pointer:fine)').matches;
+  let selected=null, dragged=null;
+  const pointerState={
+    active:false, card:null, ghost:null, pointerId:null,
+    startX:0,startY:0,lastX:0,lastY:0,timer:null,justDragged:false
+  };
+
+  function zoneAtPoint(x,y){
+    const hit=document.elementFromPoint(x,y);
+    return hit ? hit.closest('.zone') : null;
+  }
+
+  function clearPointerTargets(){
+    zones.forEach(z=>z.classList.remove('touch-target'));
+  }
+
+  function updateTapTargets(){
+    document.querySelectorAll('.label').forEach(l=>l.classList.toggle('tap-ready',!!selected));
+  }
+
+  function selectCard(card){
+    document.querySelectorAll('.card.selected').forEach(c=>c.classList.remove('selected'));
+    selected=card;
+    card.classList.add('selected');
+    updateTapTargets();
+    status.textContent='選択中：'+card.title+'｜移動先の SS / S / A / B / C をタップ';
+  }
+
+  function moveSelectedToTier(tier){
+    if(!selected) return;
+    const zone=document.querySelector(`[data-tier="${tier}"]`);
+    if(!zone) return;
+    const name=selected.title;
+    zone.appendChild(selected);
+    selected.classList.remove('selected');
+    selected=null;
+    updateTapTargets();
+    status.textContent=name+' → '+tier+' に配置';
+  }
+
+  document.querySelectorAll('.tier .label').forEach(label=>{
+    label.addEventListener('click',e=>{
+      if(!selected) return;
+      e.preventDefault();
+      const zone=label.parentElement.querySelector('.zone');
+      if(zone) moveSelectedToTier(zone.dataset.tier);
+    });
+  });
+
+  function beginPointerDrag(card,e){
+    pointerState.card=card;
+    pointerState.pointerId=e.pointerId;
+    pointerState.startX=e.clientX; pointerState.startY=e.clientY;
+    pointerState.lastX=e.clientX; pointerState.lastY=e.clientY;
+    pointerState.active=false;
+    clearTimeout(pointerState.timer);
+
+    // Long-press threshold keeps normal page scrolling/tapping usable.
+    pointerState.timer=setTimeout(()=>{
+      pointerState.active=true;
+      pointerState.justDragged=true;
+      card.classList.add('dragging');
+      try{ card.setPointerCapture(e.pointerId); }catch(_){}
+      const g=card.cloneNode(true);
+      g.classList.remove('dragging','selected');
+      g.classList.add('touch-ghost');
+      g.removeAttribute('id');
+      document.body.appendChild(g);
+      pointerState.ghost=g;
+      moveGhost(e.clientX,e.clientY);
+      status.textContent=card.title+' を移動中…';
+    },260);
+  }
+
+  function moveGhost(x,y){
+    if(pointerState.ghost){
+      pointerState.ghost.style.left=x+'px';
+      pointerState.ghost.style.top=y+'px';
+    }
+  }
+
+  function finishPointerDrag(e){
+    clearTimeout(pointerState.timer);
+    const card=pointerState.card;
+    if(pointerState.active && card){
+      const zone=zoneAtPoint(e.clientX,e.clientY);
+      if(zone){
+        const ref=nearestReference(zone,e.clientX,e.clientY);
+        zone.insertBefore(card,ref);
+        status.textContent=card.title+' → '+zone.dataset.tier+' に配置';
+      }else{
+        status.textContent='配置先のTier上で指を離してください。';
+      }
+    }
+    if(card) card.classList.remove('dragging');
+    if(pointerState.ghost) pointerState.ghost.remove();
+    clearPointerTargets();
+    pointerState.active=false;
+    pointerState.card=null;
+    pointerState.ghost=null;
+    pointerState.pointerId=null;
+  }
+
+  document.addEventListener('pointermove',e=>{
+    if(pointerState.pointerId!==e.pointerId || !pointerState.card) return;
+    pointerState.lastX=e.clientX; pointerState.lastY=e.clientY;
+    const dx=e.clientX-pointerState.startX, dy=e.clientY-pointerState.startY;
+
+    if(!pointerState.active){
+      // Cancel long-press if finger is clearly scrolling instead of dragging.
+      if(Math.hypot(dx,dy)>12){
+        clearTimeout(pointerState.timer);
+        // Treat this as a normal scroll gesture and fully release pending drag state.
+        pointerState.card=null;
+        pointerState.pointerId=null;
+      }
+      return;
+    }
+
+    e.preventDefault();
+    moveGhost(e.clientX,e.clientY);
+    clearPointerTargets();
+    const zone=zoneAtPoint(e.clientX,e.clientY);
+    if(zone) zone.classList.add('touch-target');
+  },{passive:false});
+
+  document.addEventListener('pointerup',e=>{
+    if(pointerState.pointerId===e.pointerId && pointerState.card) finishPointerDrag(e);
+  });
+
+  document.addEventListener('pointercancel',e=>{
+    if(pointerState.pointerId===e.pointerId && pointerState.card) finishPointerDrag(e);
+  });
+
+  // Android can occasionally cancel/release pointer capture during a long press.
+  document.addEventListener('lostpointercapture',e=>{
+    if(pointerState.pointerId===e.pointerId && pointerState.card && pointerState.active){
+      finishPointerDrag({clientX:pointerState.lastX,clientY:pointerState.lastY});
+    }
+  },true);
+
+
+  function bgPos(n) {
+    const i=n-1, c=i%10, r=Math.floor(i/10);
+    return `${(c/9)*100}% ${(r/27)*100}%`;
+  }
+
+  function makeCard(n) {
+    const el=document.createElement('button');
+    el.type='button';
+    el.className='card';
+    el.draggable=desktopDnD;
+    el.dataset.id=String(n);
+    el.style.backgroundPosition=bgPos(n);
+    el.title='キャラ '+String(n).padStart(2,'0');
+    el.setAttribute('aria-label',el.title);
+
+    el.addEventListener('click',()=>{
+      if(pointerState.justDragged){ pointerState.justDragged=false; return; }
+      selectCard(el);
+    });
+
+    // Desktop HTML5 drag support
+    el.addEventListener('dragstart',e=>{
+      if(!desktopDnD || pointerState.active){ e.preventDefault(); return; }
+      dragged=el;
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+      e.dataTransfer.setData('text/plain',el.dataset.id);
+    });
+
+    el.addEventListener('dragend',()=>{
+      el.classList.remove('dragging');
+      dragged=null;
+      zones.forEach(z=>z.classList.remove('dragover'));
+    });
+
+    // Unified Pointer Events for touch / pen / mouse fallback.
+    el.addEventListener('pointerdown',e=>{
+      if(e.pointerType==='mouse' && desktopDnD) return; // desktop mouse uses native drag
+      // Keep ordinary taps available in Android/Google in-app browsers.
+      // Long-press drag is handled by Pointer Events; scrolling cancels the pending drag.
+      beginPointerDrag(el,e);
+    });
+
+    // Prevent Android's long-press context menu / native drag UI.
+    el.addEventListener('contextmenu',e=>e.preventDefault());
+
+    return el;
+  }
+
+  function nearestReference(zone,x,y) {
+    const cards=[...zone.querySelectorAll('.card:not(.dragging)')];
+    if(!cards.length) return null;
+    let best=null, dist=Infinity;
+    for(const card of cards) {
+      const r=card.getBoundingClientRect();
+      const cx=r.left+r.width/2, cy=r.top+r.height/2;
+      const d=Math.hypot(x-cx,(y-cy)*1.2);
+      if(d<dist){dist=d;best={card,cx,cy,r};}
+    }
+    if(!best) return null;
+    const before = y < best.cy-8 || (Math.abs(y-best.cy)<=best.r.height/2 && x<best.cx);
+    return before ? best.card : best.card.nextSibling;
+  }
+
+  zones.forEach(zone=>{
+    zone.addEventListener('dragover',e=>{
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      zone.classList.add('dragover');
+    });
+    zone.addEventListener('dragleave',e=>{
+      if(!zone.contains(e.relatedTarget)) zone.classList.remove('dragover');
+    });
+    zone.addEventListener('drop',e=>{
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      if(!dragged) return;
+      const ref=nearestReference(zone,e.clientX,e.clientY);
+      zone.insertBefore(dragged,ref);
+      status.textContent=dragged.title+' → '+zone.dataset.tier+' に配置';
+    });
+  });
+
+  moveSelect.addEventListener('change',()=>{
+    if(!selected || !moveSelect.value){ moveSelect.value=''; return; }
+    const name=selected.title;
+    document.querySelector(`[data-tier="${moveSelect.value}"]`).appendChild(selected);
+    selected.classList.remove('selected');
+    selected=null;
+    updateTapTargets();
+    status.textContent=name+' → '+moveSelect.value+' に移動';
+    moveSelect.value='';
+  });
+
+  document.getElementById('reset').addEventListener('click',()=>{
+    document.querySelectorAll('.card').forEach(c=>c.remove());
+    selected=null;
+    updateTapTargets();
+    for(let n=1;n<=280;n++) waiting.appendChild(makeCard(n));
+    try{localStorage.removeItem(STORAGE_KEY);}catch(e){}
+    autoSave();
+    status.textContent='初期状態に戻しました。手動保存枠1〜3は残っています。';
+  });
+
+  function deleteSelectedCard(){
+    if(!selected){
+      status.textContent='削除するキャラを先にクリックしてください。';
+      return;
+    }
+    const name=selected.title || '選択キャラ';
+    selected.remove();
+    selected=null;
+    updateTapTargets();
+    status.textContent=name+' を削除しました。';
+  }
+
+  document.getElementById('deleteSelected').addEventListener('click',deleteSelectedCard);
+
+  document.addEventListener('keydown',e=>{
+    if((e.key==='Delete' || e.key==='Backspace') && selected){
+      const tag=(document.activeElement && document.activeElement.tagName) || '';
+      if(tag==='INPUT' || tag==='SELECT' || tag==='TEXTAREA') return;
+      e.preventDefault();
+      deleteSelectedCard();
+    }
+  });
+
+
+  const STORAGE_KEY='shiuTierMaker280_autosave_v2';
+  const SLOT_PREFIX='shiuTierMaker280_slot_v2_';
+  let autosaveReady=false, autosaveTimer=null;
+
+  function currentLayout(){
+    const data={}, present=new Set();
+    zones.forEach(z=>{
+      data[z.dataset.tier]=[...z.querySelectorAll('.card')].map(c=>{
+        const id=Number(c.dataset.id); present.add(id); return id;
+      });
+    });
+    data.deleted=[];
+    for(let n=1;n<=280;n++) if(!present.has(n)) data.deleted.push(n);
+    data.savedAt=new Date().toISOString();
+    return data;
+  }
+
+  function applyLayout(data){
+    if(!data || typeof data!=='object') return false;
+    document.querySelectorAll('.card').forEach(c=>c.remove());
+    selected=null; updateTapTargets();
+    for(let n=1;n<=280;n++) waiting.appendChild(makeCard(n));
+    const deleted=new Set((data.deleted||[]).map(Number));
+    const cards=new Map([...document.querySelectorAll('.card')].map(c=>[Number(c.dataset.id),c]));
+    deleted.forEach(id=>{ const c=cards.get(id); if(c){c.remove();cards.delete(id);} });
+    ['SS','S','A','B','C','WAITING'].forEach(tier=>{
+      const zone=document.querySelector(`[data-tier="${tier}"]`);
+      (data[tier]||[]).forEach(id=>{const c=cards.get(Number(id));if(c) zone.appendChild(c);});
+    });
+    updateTapTargets(); return true;
+  }
+
+  function writeStorage(key,data){localStorage.setItem(key,JSON.stringify(data));}
+  function readStorage(key){const raw=localStorage.getItem(key);return raw?JSON.parse(raw):null;}
+
+  function autoSave(){
+    if(!autosaveReady) return;
+    clearTimeout(autosaveTimer);
+    autosaveTimer=setTimeout(()=>{
+      try{
+        writeStorage(STORAGE_KEY,currentLayout());
+        document.getElementById('autosaveState').textContent='自動保存：完了';
+      }catch(e){document.getElementById('autosaveState').textContent='自動保存：失敗';}
+    },120);
+  }
+
+  function restoreAutoSave(){
+    try{const d=readStorage(STORAGE_KEY);return d?applyLayout(d):false;}catch(e){return false;}
+  }
+
+  const saveSlot=document.getElementById('saveSlot');
+  document.getElementById('saveSlotBtn').addEventListener('click',()=>{
+    try{const s=saveSlot.value;writeStorage(SLOT_PREFIX+s,currentLayout());status.textContent='保存枠'+s+' に保存しました。';}
+    catch(e){status.textContent='手動保存に失敗しました。';}
+  });
+  document.getElementById('loadSlotBtn').addEventListener('click',()=>{
+    try{
+      const s=saveSlot.value,d=readStorage(SLOT_PREFIX+s);
+      if(!d){status.textContent='保存枠'+s+' にはまだデータがありません。';return;}
+      autosaveReady=false;applyLayout(d);autosaveReady=true;autoSave();
+      status.textContent='保存枠'+s+' を読み込みました。';
+    }catch(e){autosaveReady=true;status.textContent='保存枠の読み込みに失敗しました。';}
+  });
+
+  const observer=new MutationObserver(()=>autoSave());
+
+  // Export only the completed SS–C board as a clean 1920×1080 PNG.
+  document.getElementById('exportPng').addEventListener('click',async()=>{
+    status.textContent='画像を作成しています…';
+    try{
+      const W=1920,H=1080,labelW=150,rowH=200,gap=10,top=30,card=90,cgap=8;
+      const canvas=document.createElement('canvas');
+      canvas.width=W; canvas.height=H;
+      const ctx=canvas.getContext('2d');
+
+      const grad=ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0,'#171020'); grad.addColorStop(1,'#070509');
+      ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+
+      const spriteUrl=getComputedStyle(document.querySelector('.card')).backgroundImage.slice(5,-2);
+      const img=new Image();
+      await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=spriteUrl;});
+
+      const tiers=['SS','S','A','B','C'];
+      const labelColors=['#6d2d5d','#65407e','#4d4e83','#3b536f','#39404d'];
+
+      tiers.forEach((tier,ri)=>{
+        const y=top+ri*(rowH+gap);
+        ctx.fillStyle='#110d16'; ctx.fillRect(20,y,W-40,rowH);
+        ctx.fillStyle=labelColors[ri]; ctx.fillRect(20,y,labelW,rowH);
+        ctx.fillStyle='#fff'; ctx.font='bold 54px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(tier,20+labelW/2,y+rowH/2);
+
+        const ids=[...document.querySelector(`[data-tier="${tier}"]`).querySelectorAll('.card')].map(c=>Number(c.dataset.id));
+        ids.forEach((id,i)=>{
+          const col=i%18, row=Math.floor(i/18);
+          if(row>1) return;
+          const dx=190+col*(card+cgap), dy=y+8+row*(card+cgap);
+          const zero=id-1, sc=zero%10, sr=Math.floor(zero/10);
+          const sw=img.naturalWidth/10, sh=img.naturalHeight/28;
+          ctx.drawImage(img,sc*sw,sr*sh,sw,sh,dx,dy,card,card);
+          ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=2; ctx.strokeRect(dx,dy,card,card);
+        });
+      });
+
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download='紫羽GAME_Tier表.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      status.textContent='Tier表をPNG画像で保存しました。';
+    }catch(e){
+      status.textContent='画像保存に失敗しました。別のブラウザでもお試しください。';
+    }
+  });
+
+  document.getElementById('obsMode').addEventListener('click',()=>{
+    document.body.classList.toggle('obs');
+    status.textContent=document.body.classList.contains('obs')
+      ? 'OBSモード：1920×1080向け表示'
+      : '通常モードに戻しました。';
+  });
+
+  for(let n=1;n<=280;n++) waiting.appendChild(makeCard(n));
+  const restored=restoreAutoSave();
+  zones.forEach(z=>observer.observe(z,{childList:true}));
+  autosaveReady=true;
+  if(restored) status.textContent='自動保存から前回の配置を復元しました。';
+  else autoSave();
+})();
+</script>
+</body>
+</html>
